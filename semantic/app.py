@@ -1,7 +1,7 @@
 import streamlit as st
 from typing import Dict, Any, List
 import pandas as pd
-from semantic.search_engine import StartupSearchEngine
+from search_engine import StartupSearchEngine
 import os
 from pathlib import Path
 
@@ -41,102 +41,193 @@ def display_search_results(results: List[Dict[str, Any]]):
         st.info("No results found. Try a different search query.")
         return
 
-    # Convert to DataFrame for better display
-    df = pd.DataFrame(results)
-
-    # Display results
-    for _, row in df.iterrows():
-        with st.expander(f"🚀 {row['name']} (Score: {row['similarity_score']:.2f})"):
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown(f"**Industry:** {row['industry']}")
-                st.markdown(f"**Location:** {row['location']}")
-                st.markdown(f"**Founded:** {row['founding_date']}")
-            with col2:
-                st.markdown(
-                    f"**Funding:** ${float(row['funding_amount']):,.2f}"
-                    if pd.notna(row["funding_amount"])
-                    else "**Funding:** Unknown"
-                )
+    # Check if 'type' column exists
+    if not results or "type" not in results[0]:
+        st.warning("Search results don't contain proper type information.")
+        # Display as generic results
+        for i, result in enumerate(results):
+            with st.expander(
+                f"Result {i + 1} (Score: {result['similarity_score']:.2f})"
+            ):
+                # Display all attributes
+                for key, value in result.items():
+                    if key not in ["similarity_score", "description", "type"]:
+                        st.markdown(f"**{key}:** {value}")
                 st.markdown("---")
-                st.markdown(f"**Description:** {row['description']}")
+                st.markdown(f"**Description:** {result['description']}")
+        return
+
+    # Separate companies and deals
+    companies = [r for r in results if r.get("type") == "company"]
+    deals = [r for r in results if r.get("type") == "deal"]
+
+    # Display companies
+    if companies:
+        st.subheader("Companies")
+        for i, result in enumerate(companies):
+            # Use Title or name for the header if available
+            company_name = result.get("Title", result.get("name", f"Company {i + 1}"))
+
+            with st.expander(
+                f"🏢 {company_name} (Score: {result['similarity_score']:.2f})"
+            ):
+                col1, col2 = st.columns(2)
+
+                # Column 1: Industry, Location, Year
+                with col1:
+                    # Display Industry
+                    if "Industry" in result:
+                        st.markdown(f"**Industry:** {result['Industry']}")
+
+                    # Display Location (City and/or Canton)
+                    location_parts = []
+                    if "City" in result:
+                        location_parts.append(result["City"])
+                    if "Canton" in result:
+                        location_parts.append(result["Canton"])
+                    if location_parts:
+                        st.markdown(f"**Location:** {', '.join(location_parts)}")
+
+                    # Display Year
+                    if "Year" in result:
+                        st.markdown(f"**Founded:** {result['Year']}")
+
+                # Column 2: Other info
+                with col2:
+                    # Display Funding Status
+                    if "Funded" in result:
+                        st.markdown(f"**Funding Status:** {result['Funded']}")
+
+                    # Add other important fields
+                    for key, value in result.items():
+                        if key not in [
+                            "Title",
+                            "Industry",
+                            "City",
+                            "Canton",
+                            "Year",
+                            "Funded",
+                            "type",
+                            "similarity_score",
+                            "description",
+                        ]:
+                            st.markdown(f"**{key}:** {value}")
+
+                    st.markdown("---")
+                    # Display Description (from Highlights or description)
+                    description = result.get(
+                        "Highlights", result.get("description", "")
+                    )
+                    st.markdown(f"**Description:** {description}")
+
+    # Display deals
+    if deals:
+        st.subheader("Deals")
+        for i, result in enumerate(deals):
+            # Get deal name
+            deal_name = result.get("Company", result.get("name", f"Deal {i + 1}"))
+
+            with st.expander(
+                f"💰 {deal_name} (Score: {result['similarity_score']:.2f})"
+            ):
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    # Display all available fields in first column
+                    for key, value in result.items():
+                        if key not in [
+                            "Company",
+                            "type",
+                            "similarity_score",
+                            "description",
+                        ]:
+                            st.markdown(f"**{key}:** {value}")
+
+                with col2:
+                    st.markdown("---")
+                    # Display Description
+                    description = result.get("description", "")
+                    st.markdown(f"**Description:** {description}")
+
+    # If no companies or deals found with the type field
+    if not companies and not deals and results:
+        st.warning("Results found but not categorized as companies or deals.")
+        # Display as generic results
+        for i, result in enumerate(results):
+            with st.expander(
+                f"Result {i + 1} (Score: {result['similarity_score']:.2f})"
+            ):
+                # Display all attributes
+                for key, value in result.items():
+                    if key not in ["similarity_score", "description"]:
+                        st.markdown(f"**{key}:** {value}")
+                st.markdown("---")
+                st.markdown(f"**Description:** {result['description']}")
 
 
 def display_trends(trends: Dict[str, Any]):
     """Display trend analysis results"""
     # Industry Distribution
-    st.subheader("Industry Distribution")
-    industry_df = pd.DataFrame(
-        list(trends["industry_distribution"].items()), columns=["Industry", "Count"]
-    )
-    st.bar_chart(industry_df.set_index("Industry"))
+    if trends["industry_distribution"]:
+        st.subheader("Industry Distribution")
+        industry_df = pd.DataFrame(
+            list(trends["industry_distribution"].items()), columns=["Industry", "Count"]
+        )
+        st.bar_chart(industry_df.set_index("Industry"))
 
     # Location Distribution
-    st.subheader("Location Distribution")
-    location_df = pd.DataFrame(
-        list(trends["location_distribution"].items()), columns=["Location", "Count"]
-    )
-    st.bar_chart(location_df.set_index("Location"))
-
-    # Funding Trends
-    st.subheader("Funding Trends")
-    funding_data = trends["funding_trends"]
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Total Funding", f"${funding_data['total_funding']:,.2f}")
-    with col2:
-        st.metric("Average Funding", f"${funding_data['average_funding']:,.2f}")
-    with col3:
-        st.metric("Max Funding", f"${funding_data['max_funding']:,.2f}")
-    with col4:
-        st.metric("Min Funding", f"${funding_data['min_funding']:,.2f}")
-
-    # Funding by Year
-    st.subheader("Funding by Year")
-    funding_by_year = pd.DataFrame(
-        list(funding_data["funding_by_year"].items()), columns=["Year", "Funding"]
-    )
-    st.line_chart(funding_by_year.set_index("Year"))
-
-    # Industry Funding
-    st.subheader("Industry Funding Analysis")
-    industry_funding = pd.DataFrame(trends["industry_funding"]).T
-    industry_funding.columns = [
-        "Total Funding",
-        "Average Funding",
-        "Number of Startups",
-    ]
-    st.dataframe(industry_funding)
-
-    # Location Funding
-    st.subheader("Location Funding Analysis")
-    location_funding = pd.DataFrame(trends["location_funding"]).T
-    location_funding.columns = [
-        "Total Funding",
-        "Average Funding",
-        "Number of Startups",
-    ]
-    st.dataframe(location_funding)
+    if trends["location_distribution"]:
+        st.subheader("Location Distribution")
+        location_df = pd.DataFrame(
+            list(trends["location_distribution"].items()), columns=["Location", "Count"]
+        )
+        st.bar_chart(location_df.set_index("Location"))
 
     # Founding Trends
-    st.subheader("Founding Trends")
     founding_data = trends["founding_trends"]
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Average Age", f"{founding_data['average_age']:.1f} years")
-    with col2:
-        st.metric("Oldest Startup", founding_data["oldest_startup"])
-    with col3:
-        st.metric("Newest Startup", founding_data["newest_startup"])
-    with col4:
-        st.metric("Total Startups", sum(founding_data["startups_per_year"].values()))
+    if founding_data["total_startups"] > 0:
+        st.subheader("Founding Trends")
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Average Age", f"{founding_data['average_age']:.1f} years")
+        with col2:
+            st.metric("Oldest Startup", str(founding_data["oldest_startup"]))
+        with col3:
+            st.metric("Newest Startup", str(founding_data["newest_startup"]))
+        with col4:
+            st.metric("Total Startups", founding_data["total_startups"])
 
-    # Startups per Year
-    st.subheader("Startups Founded per Year")
-    startups_per_year = pd.DataFrame(
-        list(founding_data["startups_per_year"].items()), columns=["Year", "Count"]
-    )
-    st.line_chart(startups_per_year.set_index("Year"))
+        # Startups per Year
+        if founding_data["startups_per_year"]:
+            st.subheader("Startups Founded per Year")
+            startups_per_year = pd.DataFrame(
+                list(founding_data["startups_per_year"].items()),
+                columns=["Year", "Count"],
+            )
+            st.line_chart(startups_per_year.set_index("Year"))
+
+    # Deal Trends
+    deal_data = trends["deal_trends"]
+    if deal_data["total_deals"] > 0:
+        st.subheader("Deal Analysis")
+
+        # Deal Types
+        if deal_data["deal_types"]:
+            st.subheader("Deal Types Distribution")
+            deal_types_df = pd.DataFrame(
+                list(deal_data["deal_types"].items()), columns=["Type", "Count"]
+            )
+            st.bar_chart(deal_types_df.set_index("Type"))
+
+        # Deals by Year
+        if deal_data["deals_by_year"]:
+            st.subheader("Deals per Year")
+            deals_by_year = pd.DataFrame(
+                list(deal_data["deals_by_year"].items()), columns=["Year", "Count"]
+            )
+            st.line_chart(deals_by_year.set_index("Year"))
+
+        st.metric("Total Deals", deal_data["total_deals"])
 
 
 # Main app

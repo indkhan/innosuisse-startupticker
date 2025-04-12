@@ -1,0 +1,12 @@
+README.md
+setup.py
+semantic/__init__.py
+semantic/app.py
+semantic/data_loader.py
+semantic/search_engine.py
+semantic/vector_store.py
+semantic.egg-info/PKG-INFO
+semantic.egg-info/SOURCES.txt
+semantic.egg-info/dependency_links.txt
+semantic.egg-info/requires.txt
+semantic.egg-info/top_level.txt

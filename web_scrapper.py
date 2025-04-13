@@ -15,6 +15,12 @@ import time
 import os
 import requests
 from selenium.webdriver.common.action_chains import ActionChains
+import urllib3
+import warnings
+
+# Disable SSL verification warnings - only for debugging purposes
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+warnings.filterwarnings("ignore", message="Unverified HTTPS request")
 
 
 def download_sogc_data(uid="CHE-236.101.881", output_format="pdf", download_dir=None):
@@ -55,6 +61,12 @@ def download_sogc_data(uid="CHE-236.101.881", output_format="pdf", download_dir=
     # Additional options for Windows stability
     chrome_options.add_argument("--disable-extensions")
     chrome_options.add_argument("--disable-software-rasterizer")
+
+    # Add SSL error handling options
+    chrome_options.add_argument("--ignore-certificate-errors")
+    chrome_options.add_argument("--ignore-ssl-errors")
+    chrome_options.add_argument("--allow-insecure-localhost")
+    chrome_options.add_argument("--disable-web-security")
 
     # Enable performance logging to capture network requests
     chrome_options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
@@ -109,14 +121,60 @@ def download_sogc_data(uid="CHE-236.101.881", output_format="pdf", download_dir=
         print(f"Searching for UID: {uid}")
 
         # Navigate to SOGC search page - this initial load is necessary
-        driver.get("https://www.shab.ch/#!/search/publications")
+        print("Navigating to SOGC search page...")
+        try:
+            driver.get("https://www.shab.ch/#!/search/publications")
 
-        # Wait for page to load by checking for a common element
-        print("Waiting for page to load...")
-        wait.until(EC.presence_of_element_located((By.XPATH, "//body")))
-        wait.until(
-            lambda d: d.execute_script("return document.readyState") == "complete"
-        )
+            # Wait for page to load by checking for a common element
+            print("Waiting for page to load...")
+            wait.until(EC.presence_of_element_located((By.XPATH, "//body")))
+            wait.until(
+                lambda d: d.execute_script("return document.readyState") == "complete"
+            )
+        except TimeoutException:
+            print("Timeout on main URL, trying alternative URL...")
+            # Try alternative URLs in sequence
+            alternative_urls = [
+                "https://www.shab.ch/shab/de/home.htm",
+                "https://www.shab.ch/#!/home",
+                "https://www.sogc.ch/#!/search",
+                "https://www.zefix.ch/en/search/entity/welcome",
+            ]
+
+            for alt_url in alternative_urls:
+                try:
+                    print(f"Trying alternative URL: {alt_url}")
+                    driver.get(alt_url)
+                    time.sleep(3)
+
+                    # Check if page loaded successfully
+                    if (
+                        "shab" in driver.current_url
+                        or "zefix" in driver.current_url
+                        or "sogc" in driver.current_url
+                    ):
+                        print("Alternative URL loaded successfully")
+
+                        # Navigate to search page if possible
+                        try:
+                            search_links = driver.find_elements(
+                                By.XPATH,
+                                "//a[contains(@href, 'search') or contains(text(), 'Search') or contains(text(), 'Suche')]",
+                            )
+                            if search_links:
+                                print(
+                                    f"Found {len(search_links)} possible search links"
+                                )
+                                driver.execute_script(
+                                    "arguments[0].click();", search_links[0]
+                                )
+                                time.sleep(2)
+                                break
+                        except Exception as e:
+                            print(f"Error trying to find search links: {e}")
+                except Exception as e:
+                    print(f"Failed to load alternative URL {alt_url}: {e}")
+                    continue
 
         # Wait for the search interface to be visible
         try:
@@ -814,8 +872,45 @@ def download_sogc_data(uid="CHE-236.101.881", output_format="pdf", download_dir=
                             print(f"Error renaming PDF file: {e}")
                 else:
                     print("No PDF files were downloaded")
+
+                    # Try direct download using requests as a last resort
+                    print("Attempting direct download as last resort...")
+                    try:
+                        # Try to extract the direct download URL from the page
+                        download_url = driver.execute_script("""
+                            // Look for link that might contain PDF
+                            var pdfLinks = Array.from(document.querySelectorAll('a'))
+                                .filter(a => a.href && 
+                                    (a.href.includes('.pdf') || a.href.includes('download') || 
+                                     a.href.includes('export') || a.href.includes('document')));
+                            
+                            return pdfLinks.length > 0 ? pdfLinks[0].href : '';
+                        """)
+
+                        if download_url:
+                            print(f"Found potential download URL: {download_url}")
+                            pdf_path = os.path.join(download_dir, f"{uid}.pdf")
+                            if download_file_with_requests(download_url, pdf_path):
+                                print(f"Successfully downloaded PDF to {pdf_path}")
+                        else:
+                            # No direct link found, try constructing a URL
+                            print("No direct link found, trying constructed URL...")
+                            constructed_url = f"https://www.shab.ch/shab/api/publications/uid/{uid}/pdf"
+                            pdf_path = os.path.join(download_dir, f"{uid}.pdf")
+                            if download_file_with_requests(constructed_url, pdf_path):
+                                print(
+                                    f"Successfully downloaded PDF from constructed URL to {pdf_path}"
+                                )
+                    except Exception as e:
+                        print(f"Direct download attempt failed: {e}")
+
+                        # Try Zefix as a last resort
+                        try_zefix_lookup(driver, uid, download_dir)
             else:
                 print("Failed to find and click PDF button")
+
+                # Try Zefix as a last resort
+                try_zefix_lookup(driver, uid, download_dir)
 
     except Exception as e:
         print(f"Error: {e}")
@@ -823,6 +918,136 @@ def download_sogc_data(uid="CHE-236.101.881", output_format="pdf", download_dir=
         print("Closing browser...")
         driver.quit()
         print(f"Process completed. Check {download_dir} for downloaded files.")
+
+
+def download_file_with_requests(url, save_path, attempt=1, max_attempts=3):
+    """
+    Download a file using requests with retries
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+
+    try:
+        print(f"Downloading {url} using requests (attempt {attempt}/{max_attempts})...")
+        response = requests.get(
+            url, headers=headers, stream=True, verify=False, timeout=30
+        )
+        response.raise_for_status()
+
+        with open(save_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+        print(f"Successfully downloaded to {save_path}")
+        return True
+    except requests.RequestException as e:
+        print(f"Download error: {e}")
+        if attempt < max_attempts:
+            print(f"Retrying ({attempt + 1}/{max_attempts})...")
+            time.sleep(2)
+            return download_file_with_requests(
+                url, save_path, attempt + 1, max_attempts
+            )
+        else:
+            print(f"Failed after {max_attempts} attempts")
+            return False
+
+
+def try_zefix_lookup(driver, uid, download_dir):
+    """
+    Try to lookup a company on Zefix as a fallback
+    """
+    try:
+        print("Attempting Zefix lookup...")
+        driver.get("https://www.zefix.ch/en/search/entity/welcome")
+        time.sleep(3)
+
+        # Check if we need to accept cookies
+        try:
+            cookie_buttons = driver.find_elements(
+                By.XPATH,
+                "//button[contains(text(), 'Accept') or contains(text(), 'Akzeptieren') or contains(@id, 'cookie')]",
+            )
+            if cookie_buttons:
+                cookie_buttons[0].click()
+                time.sleep(1)
+        except Exception:
+            pass
+
+        # Try to find the UID search field
+        uid_inputs = driver.find_elements(
+            By.XPATH, "//input[contains(@placeholder, 'UID') or contains(@id, 'uid')]"
+        )
+        if uid_inputs:
+            print("Found UID input on Zefix")
+            uid_inputs[0].clear()
+            uid_inputs[0].send_keys(uid)
+
+            # Find and click search button
+            search_buttons = driver.find_elements(
+                By.XPATH,
+                "//button[contains(text(), 'Search') or contains(@type, 'submit') or contains(@class, 'search')]",
+            )
+            if search_buttons:
+                search_buttons[0].click()
+                time.sleep(5)
+
+                # Check for results
+                result_links = driver.find_elements(
+                    By.XPATH,
+                    "//a[contains(@class, 'detail') or contains(@href, 'detail')]",
+                )
+                if result_links:
+                    print("Found company in Zefix results")
+                    result_links[0].click()
+                    time.sleep(3)
+
+                    # Try to find extract or history button
+                    extract_buttons = driver.find_elements(
+                        By.XPATH,
+                        "//button[contains(text(), 'Extract') or contains(text(), 'History') or contains(text(), 'PDF')]",
+                    )
+                    if extract_buttons:
+                        extract_buttons[0].click()
+                        time.sleep(2)
+
+                        # Wait for download to start
+                        start_time = time.time()
+                        max_wait = 30
+                        while time.time() - start_time < max_wait:
+                            pdf_files = [
+                                f
+                                for f in os.listdir(download_dir)
+                                if f.endswith(".pdf")
+                            ]
+                            recent_pdfs = [
+                                f
+                                for f in pdf_files
+                                if os.path.getctime(os.path.join(download_dir, f))
+                                > start_time
+                            ]
+                            if recent_pdfs:
+                                latest_pdf = max(
+                                    recent_pdfs,
+                                    key=lambda f: os.path.getctime(
+                                        os.path.join(download_dir, f)
+                                    ),
+                                )
+                                target_path = os.path.join(download_dir, f"{uid}.pdf")
+                                os.rename(
+                                    os.path.join(download_dir, latest_pdf), target_path
+                                )
+                                print(
+                                    f"Successfully downloaded and renamed Zefix PDF to {target_path}"
+                                )
+                                return True
+                            time.sleep(1)
+
+        return False
+    except Exception as e:
+        print(f"Zefix lookup failed: {e}")
+        return False
 
 
 if __name__ == "__main__":

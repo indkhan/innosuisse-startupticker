@@ -87,3 +87,76 @@ The closer the solution is to a usable product, the better.
 ## Price - the winning team members will each receive:
 
 Introduction to the Swiss start-up ecosystem and hands-on tips if winner is interested in starting a company or working with a start-up.
+
+# Swiss Startup Funding Analysis
+
+A Streamlit-based web application that lets you query Swiss startup funding data using natural language. The application converts natural language queries into SPARQL and provides analysis of the results.
+
+## Features
+
+- Natural language interface for querying startup funding data
+- Interactive Streamlit UI with analysis visualizations
+- SPARQL query generation using LLM (Google Gemini)
+- Support for industry-specific queries and trend analysis
+- Detailed funding analysis with insights
+
+## Setup
+
+### Prerequisites
+
+- Python 3.8 or higher
+- A Google API key for Gemini
+
+### Installation
+
+1. Clone the repository:
+```
+git clone <repository-url>
+cd <repository-folder>
+```
+
+2. Install the required dependencies:
+```
+pip install -r requirements.txt
+```
+
+3. Create a `.env` file in the root directory and add your Google API key:
+```
+GOOGLE_API_KEY=your_google_api_key_here
+```
+
+### Running the Application
+
+1. Start the Streamlit application:
+```
+streamlit run app.py
+```
+
+2. Open your browser and navigate to the URL displayed in the terminal (typically http://localhost:8501)
+
+## Example Queries
+
+- "Show funding trends in the cleantech industry"
+- "What are the top medtech companies by funding amount?"
+- "Compare funding between biotech and ICT industries"
+- "How has funding in healthcare IT changed over time?"
+- "Which cantons have the most startups?"
+
+## Available Industries
+
+The database includes the following industries:
+- cleantech
+- biotech
+- medtech
+- healthcare IT
+- ICT
+- ICT (fintech)
+- micro / nano
+- Life-Sciences
+
+## Project Structure
+
+- `app.py` - Streamlit frontend application
+- `llm.py` - Core logic for processing queries and generating SPARQL
+- `startups_graph.ttl` - RDF graph containing the startup data
+- `requirements.txt` - Dependencies list

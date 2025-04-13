@@ -1,0 +1,6 @@
+@prefix ex: <http://example.org/ontology#> .
+@prefix res: <http://example.org/resource/> .
+
+res:test_company a ex:Startup ;
+    ex:name "Test Company" ;
+    ex:hasIndustry [ ex:name "ICT" ] . 

@@ -1,0 +1,42 @@
+Data field,Description,Data type
+uuid, ID used to identify organization,char
+name, Name of organization,char
+type, type of company (only contains organization in this database),char (classification)
+permalink, ID used to identify the organization,char
+cb_url, Crunchbase profile URL,char
+rank, Algorithmic rank assigned to the top 100’000 most active organizations,int
+created_at, Time company was created on Crunchbase,date
+updated_at, Time organization was last updated,date
+legal_name, Legal name of organization,char
+roles, Roles of organization ,list
+domain, Domain of organization,char
+homepage_url, Link to organizations website,char
+country_code, Country that company is located in ,char
+state_code, state code of an organization,char
+region, Region that company is located in,char
+city, City that company is located in,char
+address, Organization’s Street address,char
+postal_code, Postal code of company’s HQ,char
+status, Status of an organization,char (classification)
+short_description, Short description for the company,char
+category_list, list of categories tagged to the company,list
+category_groups_list, list of category groups tagged to the company,list
+num_funding_rounds,total numbe of funding rounds,numeric
+total_funding_usd, Total funding amount raised across all funding rounds in USD,numeric
+total_funding, Total funding amount raised across all funding rounds,numeric
+total_funding_currency_code, Currency code of total funding amount raised across all funding rounds,char
+founded_on, Time organization was founded on ,date
+last_funding_on, Date of company’s most recent funding round,date
+closed_on, Date the company closed,date
+employee_count, Total number of employees,char (classification)
+email, General contact info for the organization,char
+phone, Phone number of company,char
+facebook_url, Link to organizations Facebook,char
+linkedin_url, Link to organizations LinkedIn,char
+twitter_url, Link to organizations Twitter,char
+logo_url, URL for the image related to the organization,char
+"alias1, 2, 3", Other known names/alternate/previous names of the company,char
+primary_role, Role of company,char (classification)
+num_exits, Sum of all exits related to the organization,numeric
+,,
+! This data is only to be used within the competition of SwissHacks 2025 !,,

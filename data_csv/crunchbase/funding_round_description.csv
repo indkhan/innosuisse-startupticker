@@ -1,0 +1,27 @@
+Data field,Description,Data type
+uuid,ID used to identify the funding round,char
+name,Name of funding round,char
+type,Type of entity,char (classification)
+permalink,ID used to identify the funding round,char
+cb_url,Crunchbase profile URL,char
+rank,Algorithmic rank assigned to the top 100’000 most active funding rounds,int
+created_at,Time funding round was created,date
+updated_at,Time of last update to funding round,date
+country_code,Country code associated with the funding round,char
+state_code,State code associated with organization related to the funding round,char
+region,Region associated with organization related to the funding round,char
+city,City that is associated with the funding round,char
+investment_type,Investment type related to the funding round,char (classification)
+announced_on,Date the funding rounds was announced on,date
+raised_amount_usd,Money raised in the funding round in USD,numeric
+raised_amount,Money raised in the funding round,numeric
+raised_amount_currency_code,Currency code of money raised in the funding round,char
+post_money_valuation_usd,Post money valuation at the time of the funding round in USD,numeric
+post_money_valuation, Post money valuation at the time of the funding round,numeric
+post_money_valuation_currency_code,Currency code of post money valuation at the time of the funding round,char
+investor_count,Number of investors involved in the funding round,numeric
+org_uuid,ID used to identify the funded organization,char
+org_name,ID used to identify the funded organization,char
+lead_investor_uuids,ID(s) used to identify the lead investors involved in the funding round,char
+,,
+! This data is only to be used within the competition of SwissHacks 2025 !,,

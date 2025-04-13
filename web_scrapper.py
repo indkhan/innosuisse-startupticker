@@ -30,29 +30,72 @@ def download_sogc_data(uid="CHE-236.101.881", output_format="pdf", download_dir=
     if download_dir is None:
         download_dir = os.path.join(os.getcwd(), "sogc_downloads")
 
+    # Ensure absolute path (Windows compatibility)
+    download_dir = os.path.abspath(download_dir)
+
+    print(f"Using download directory: {download_dir}")
+
+    if not os.path.exists(download_dir):
+        os.makedirs(download_dir)
+        print(f"Created download directory: {download_dir}")
+
     if not os.path.exists(download_dir):
         os.makedirs(download_dir)
 
     # Configure Chrome options
     chrome_options = Options()
     chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("--headless")  # Run in headless mode
+    chrome_options.add_argument("--disable-gpu")  # Disable GPU acceleration
+    chrome_options.add_argument("--no-sandbox")  # Disable sandbox for better stability
+    chrome_options.add_argument(
+        "--disable-dev-shm-usage"
+    )  # Overcome limited resource problems
+
+    # Additional options for Windows stability
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--disable-software-rasterizer")
 
     # Enable performance logging to capture network requests
     chrome_options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
 
+    # Setup download preferences - make sure to escape backslashes on Windows
+    download_dir_escaped = (
+        download_dir.replace("\\", "\\\\") if os.name == "nt" else download_dir
+    )
+    print(f"Using escaped download path for Chrome: {download_dir_escaped}")
+
     prefs = {
-        "download.default_directory": os.path.abspath(download_dir),
+        "download.default_directory": download_dir_escaped,
         "download.prompt_for_download": False,
         "download.directory_upgrade": True,
         "plugins.always_open_pdf_externally": True,  # Don't open PDFs in browser
         "safebrowsing.enabled": True,
+        "profile.default_content_setting_values.automatic_downloads": 1,  # Allow multiple downloads
     }
     chrome_options.add_experimental_option("prefs", prefs)
 
     # Initialize the WebDriver with WebDriverManager for automatic driver management
-    driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()), options=chrome_options
-    )
+    try:
+        service = Service(ChromeDriverManager().install())
+        print(f"Chrome driver path: {service.path}")
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        print("Chrome driver successfully initialized")
+    except Exception as e:
+        print(f"Error initializing Chrome driver: {e}")
+        # Try a fallback method
+        try:
+            print("Trying fallback method for Chrome driver initialization")
+            from selenium.webdriver.chrome.service import Service as ChromeService
+
+            driver = webdriver.Chrome(
+                service=ChromeService(ChromeDriverManager().install()),
+                options=chrome_options,
+            )
+            print("Chrome driver successfully initialized with fallback method")
+        except Exception as e2:
+            print(f"Fallback method also failed: {e2}")
+            raise
 
     # Define wait
     wait = WebDriverWait(

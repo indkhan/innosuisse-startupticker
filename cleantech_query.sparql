@@ -1,0 +1,10 @@
+PREFIX ex: <http://example.org/ontology#>
+PREFIX res: <http://example.org/resource/>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT ?startup ?name WHERE {
+  ?startup rdf:type ex:Startup .
+  ?startup ex:name ?name .
+  ?startup ex:hasIndustry ?industry .
+  ?industry ex:name "Cleantech" .
+} 

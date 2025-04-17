@@ -105,8 +105,178 @@ def summarize_pdf_content(text, company_name):
     return summary
 
 
-# Create a layout with two columns for the input and SOGC button
-col1, col2 = st.columns([4, 1])
+# Function to get company data from Crunchbase
+def get_crunchbase_data(company_name):
+    try:
+        # Load organizations data
+        orgs_path = "data_csv/crunchbase/organizations.csv"
+        orgs_df = pd.read_csv(orgs_path)
+
+        # Normalize company name and search
+        normalized_name = company_name.lower().strip()
+
+        # Search for company in the name field (case-insensitive)
+        matched_orgs = orgs_df[
+            orgs_df["name"].str.lower().str.contains(normalized_name, na=False)
+        ]
+
+        if matched_orgs.empty:
+            return None, None
+
+        # Get the first matching organization
+        org = matched_orgs.iloc[0]
+
+        # Load funding rounds data for this company
+        rounds_path = "data_csv/crunchbase/funding_rounds.csv"
+        rounds_df = pd.read_csv(rounds_path)
+
+        # Filter funding rounds for this company
+        org_rounds = rounds_df[rounds_df["org_uuid"] == org["uuid"]]
+
+        return org, org_rounds
+    except Exception as e:
+        st.error(f"Error loading Crunchbase data: {str(e)}")
+        return None, None
+
+
+# Function to display Crunchbase company information
+def display_crunchbase_info(org, funding_rounds):
+    if org is None:
+        st.error("Company not found in Crunchbase data")
+        return
+
+    # Company info section
+    st.subheader(f"Crunchbase: {org['name']}")
+
+    # Create two columns for company info
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("### Company Information")
+        company_info = {
+            "Name": org.get("name", "N/A"),
+            "Founded": org.get("founded_on", "N/A"),
+            "Location": f"{org.get('city', '')} {org.get('region', '')} {org.get('country_code', '')}".strip(),
+            "Status": org.get("status", "N/A"),
+            "Employees": org.get("employee_count", "N/A"),
+            "Website": org.get("homepage_url", "N/A"),
+            "Description": org.get("short_description", "N/A"),
+            "Categories": org.get("category_list", "N/A"),
+        }
+
+        for key, value in company_info.items():
+            st.markdown(f"**{key}:** {value}")
+
+    with col2:
+        st.markdown("### Funding Summary")
+        funding_info = {
+            "Total Funding": f"{org.get('total_funding', 0):,.0f} {org.get('total_funding_currency_code', '')}",
+            "Funding Rounds": org.get("num_funding_rounds", 0),
+            "Last Funding": org.get("last_funding_on", "N/A"),
+        }
+
+        for key, value in funding_info.items():
+            st.markdown(f"**{key}:** {value}")
+
+        # Add links if available
+        if pd.notna(org.get("cb_url")):
+            st.markdown(f"[View on Crunchbase]({org['cb_url']})")
+
+        if pd.notna(org.get("linkedin_url")):
+            st.markdown(f"[LinkedIn]({org['linkedin_url']})")
+
+        if pd.notna(org.get("twitter_url")):
+            st.markdown(f"[Twitter]({org['twitter_url']})")
+
+    # Show funding rounds if available
+    if funding_rounds is not None and not funding_rounds.empty:
+        st.markdown("### Funding Rounds")
+
+        # Prepare funding rounds data for display
+        display_rounds = funding_rounds.copy()
+
+        # Convert date columns to datetime for sorting
+        if "announced_on" in display_rounds.columns:
+            display_rounds["announced_on"] = pd.to_datetime(
+                display_rounds["announced_on"], errors="coerce"
+            )
+
+        # Sort by date (most recent first)
+        display_rounds = display_rounds.sort_values(by="announced_on", ascending=False)
+
+        # Select relevant columns for display
+        display_cols = [
+            "announced_on",
+            "investment_type",
+            "raised_amount",
+            "raised_amount_currency_code",
+            "investor_count",
+        ]
+
+        # Display funding rounds in table
+        if all(col in display_rounds.columns for col in display_cols):
+            rounds_table = display_rounds[display_cols].copy()
+
+            # Format for display
+            rounds_table["announced_on"] = rounds_table["announced_on"].dt.date
+            rounds_table["amount"] = rounds_table.apply(
+                lambda x: f"{x['raised_amount']:,.0f} {x['raised_amount_currency_code']}"
+                if pd.notna(x["raised_amount"])
+                else "N/A",
+                axis=1,
+            )
+
+            # Display cleaned table
+            st.dataframe(
+                rounds_table[
+                    ["announced_on", "investment_type", "amount", "investor_count"]
+                ].rename(
+                    columns={
+                        "announced_on": "Date",
+                        "investment_type": "Round Type",
+                        "amount": "Amount",
+                        "investor_count": "Investors",
+                    }
+                ),
+                use_container_width=True,
+            )
+
+            # Create a funding history visualization
+            if len(rounds_table) > 0:
+                st.markdown("### Funding History")
+
+                # Prepare data for chart
+                chart_data = display_rounds.copy()
+                chart_data["year"] = chart_data["announced_on"].dt.year
+
+                # Group by year and sum funding
+                yearly_funding = (
+                    chart_data.groupby("year")["raised_amount"].sum().reset_index()
+                )
+
+                if not yearly_funding.empty:
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    ax.bar(yearly_funding["year"], yearly_funding["raised_amount"])
+                    ax.set_title(f"Funding History: {org['name']}")
+                    ax.set_xlabel("Year")
+                    ax.set_ylabel(
+                        f"Amount ({org.get('total_funding_currency_code', 'USD')})"
+                    )
+
+                    # Format y-axis labels in millions
+                    ax.yaxis.set_major_formatter(lambda x, pos: f"{x / 1000000:.1f}M")
+
+                    plt.xticks(rotation=45)
+                    plt.tight_layout()
+                    st.pyplot(fig)
+        else:
+            st.info("Limited funding round information available")
+    else:
+        st.info("No funding rounds found for this company")
+
+
+# Create a layout with three columns for the input and buttons
+col1, col2, col3 = st.columns([4, 1, 1])
 
 # Input for query in the first column
 with col1:
@@ -118,6 +288,10 @@ with col1:
 # SOGC button in the second column
 with col2:
     sogc_button = st.button("Get SOGC Data")
+
+# Crunchbase button in the third column
+with col3:
+    crunchbase_button = st.button("Get Crunchbase Data")
 
 # Handle SOGC button click
 if sogc_button:
@@ -163,6 +337,21 @@ if sogc_button:
                     st.error(
                         f"Failed to download SOGC data for {company_name} (UID: {uid})"
                     )
+    else:
+        st.warning("Please enter a company name or query first.")
+
+# Handle Crunchbase button click
+if crunchbase_button:
+    if query:
+        with st.spinner("Fetching Crunchbase data..."):
+            # Extract company name from query
+            company_name = query
+
+            # Get data from Crunchbase
+            org, funding_rounds = get_crunchbase_data(company_name)
+
+            # Display Crunchbase information
+            display_crunchbase_info(org, funding_rounds)
     else:
         st.warning("Please enter a company name or query first.")
 

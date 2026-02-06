@@ -1,4 +1,5 @@
 langchain-google-genai==0.0.10rc0
+selenium==4.17.2
 
 python-dotenv==1.0.1
 rdflib==7.0.0

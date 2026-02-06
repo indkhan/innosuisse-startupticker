@@ -19,7 +19,7 @@ RES = Namespace("http://example.org/resource/")
 
 # Initialize LLM
 model = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash-001",
+    model="gemini-flash-lite-latest",
     google_api_key=os.getenv("GOOGLE_API_KEY"),
     temperature=0.0,
     convert_system_message_to_human=True

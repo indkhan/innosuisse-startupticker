@@ -902,4 +902,4 @@ if st.button("Process Query") or query:
 
 # Footer
 st.markdown("---")
-st.caption("Powered by Google Gemini 2.0 Flash")
+st.caption("Powered by Google Gemini flash lite latest")

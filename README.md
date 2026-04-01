@@ -5,7 +5,7 @@ A powerful, intuitive platform that transforms Swiss startup data into actionabl
 
 ## 🚀 Overview
 
-InnoScope is a sophisticated yet user-friendly platform built specifically for Switzerland's startup ecosystem. It unlocks the valuable Startupticker database by enabling non-technical users to query and analyze Swiss startup funding data using simple natural language questions. The system automatically transforms user questions into complex SPARQL queries, performs semantic analysis, and presents the results through interactive visualizations.
+SwissInsight is a sophisticated yet user-friendly platform built specifically for Switzerland's startup ecosystem. It unlocks the valuable Startupticker database by enabling non-technical users to query and analyze Swiss startup funding data using simple natural language questions. The system automatically transforms user questions into complex SPARQL queries, performs semantic analysis, and presents the results through interactive visualizations.
 
 ## 🛠️ Technical Implementation
 
